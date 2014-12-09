@@ -36,11 +36,13 @@ public class ClipIdentifiers extends AnAction {
             return;
         }
 
+        final Integer offset = editor.getCaretModel().getOffset();
+
         final CopyPasteManager cpm = CopyPasteManager.getInstance();
 
         final Document document = editor.getDocument();
         final String text = document.getText();
-        final List<String> identifiers = IdentifierGrabber.apply(text);
+        final List<String> identifiers = IdentifierGrabber.asJava(text, offset);
 
         for (String id : identifiers) {
             StringSelection strSel = new StringSelection(id);

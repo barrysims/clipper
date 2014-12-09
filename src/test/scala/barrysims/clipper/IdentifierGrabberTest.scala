@@ -11,28 +11,10 @@ class IdentifierGrabberTest extends FlatSpec with Matchers {
 
   val src: String = Source.fromURL(getClass.getResource("/Example.scala")).mkString
 
-  "IdentfierGrabber" should "find val identifiers" in {
-    IdentifierGrabber(src, List("VAL")) should equal (List("exVal").asJava)
-  }
-
-  it should "find var identifiers" in {
-    IdentifierGrabber(src, List("VAR")) should equal (List("exVar").asJava)
-  }
-
-  it should "find object identifiers" in {
-    IdentifierGrabber(src, List("OBJECT")) should equal (List("ExObject").asJava)
-  }
-
-  it should "find class identifiers" in {
-    IdentifierGrabber(src, List("CLASS")) should equal (List("ExClass").asJava)
-  }
-
-  it should "find trait identifiers" in {
-    IdentifierGrabber(src, List("TRAIT")) should equal (List("ExTrait").asJava)
-  }
-
-  it should "find def identifiers" in {
-    IdentifierGrabber(src, List("DEF")) should equal (List("exDef").asJava)
+  "Identifier Grabber" should "find val identifiers" in {
+    val offset = 130
+    println(src.substring(offset - 10, offset + 10))
+    IdentifierGrabber(src, offset) should equal (List("ExTrait", "ExClass", "ExObject"))
   }
 }
 

@@ -12,6 +12,7 @@ scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature", "-target:jvm-1.6
 
 libraryDependencies ++= Seq(
   "com.danieltrinh" %% "scalariform" % "0.1.5",
+  "org.scalaz" %% "scalaz-core" % "7.1.0",
   "org.scalatest" % "scalatest_2.10" % "2.2.0" % "test")
 
 unmanagedBase := baseDirectory.value / "none"
