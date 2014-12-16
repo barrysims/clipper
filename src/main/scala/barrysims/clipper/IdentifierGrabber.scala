@@ -25,59 +25,93 @@ object IdentifierGrabber {
   def asJava(src: String, offset: Int): java.util.List[String] = apply(src, offset)
 
   /**
-   * Kleislis, for the hell of it
-   *
    * @param src The scala source, as a String
    * @param offset The current cursor position
    * @return A list of in-scope identifiers
    */
   def apply(src: String, offset: Int) = {
     kleisli(parse) >=>
-    kleisli(astToTree ∘ findInScopeNodes(offset)) >=>
+    kleisli(nodeToTree ∘ findInScopeNodes(offset)) >=>
     kleisli(nodesToIdentifiers)
   }.apply(src) some {_.flatten.distinct} none Nil
 
   private lazy val parse = (src: String) => ScalaParser.parse(src)
 
-  private lazy val astToTree = (node: AstNode) => {
-    val t = treeRec(node).head
-    println(draw(t))
-    t
-  }
-
   private lazy val findInScopeNodes = (offset: Int) => (tree: Tree[AstNode]) => {
-    lazy val inRange = (r: Range) => r.contains(Range(offset, 0))
+    lazy val inRange = (r: Option[Range]) => r some (_.contains(Range(offset, 0))) none false
+
+    def find(child: Tree[AstNode]): Boolean = child.rootLabel match {
+      case _: TmplDef | _: IfExpr | _: CompilationUnit => inRange(child.rootLabel.rangeOpt)
+      case _ => false
+    }
     @tailrec
-    def recChild(z: TreeLoc[AstNode]): Option[TreeLoc[AstNode]] = {
-      z.findChild(_.rootLabel.rangeOpt some inRange none false) match {
-        case Some(c) => recChild(c)
+    def nodeAtOffset(z: TreeLoc[AstNode]): Option[TreeLoc[AstNode]] = {
+      z.findChild (find) match {
+        case Some(c) => nodeAtOffset(c)
         case None => Some(z)
       }}
-    recChild(tree.loc) ∘ (_.parents.toList ∘ siblings flatten)
+
+    val node = nodeAtOffset(tree.loc)
+
+    node ∘ { n => (children(n.getLabel) ++ (n.parents.toList ∘ (p => children(p._2))).flatten).reverse }
+  }
+
+  private def children(n: AstNode): List[AstNode] = {
+    nodeToTree(n).subForest ∘ (_.rootLabel)
+  }.toList
+
+  private lazy val nodeToTree = (node: AstNode) => {
+    def treeRec(n: AstNode): List[Tree[AstNode]] = {
+      filterNode(n) match {
+        case Some(x) => List(x.node(x.immediateChildren ∘ treeRec flatten: _*))
+        case None => n.immediateChildren ∘ treeRec flatten
+      }
+    }
+    treeRec(node) head
+  }
+
+  private def filterNode(n: AstNode): Option[AstNode] = {
+
+    lazy val nodeSel = (pf: PartialFunction[AstNode, AstNode]) => (x: AstNode) => x.immediateChildren.collectFirst(pf)
+    lazy val findNode = kleisli(nodeSel { case x: Expr => x }) >=> kleisli(nodeSel { case x: GeneralTokens => x })
+
+    n match {
+      case _: FunDefOrDcl | _: TmplDef | _: IfExpr | _: CompilationUnit => Some(n)
+      case _: PatDefOrDcl => findNode(n)
+      case _ => None
+    }
   }
 
   private lazy val nodesToIdentifiers = (nodes: List[AstNode]) => Option(nodes ∘ nodeToId)
 
-  private def treeRec(n: AstNode): List[Tree[AstNode]] = List(n.node(n.immediateChildren ∘ treeRec flatten: _*))
-
-  private def siblings[A](p: Parent[A]) = {
-    val tf2l = (tf: TreeForest[A]) => tf.toStream ∘ (_.rootLabel)
-    tf2l(p._1) ++ Stream(p._2) ++ tf2l(p._3)
-  }
 
   private def nodeToId(node: AstNode) = node match {
     case _: PackageBlock | _: PackageStat | _: ImportExpr | _: ImportClause | _: ImportSelectors => None
     case _ => peer(node).collectFirst { case t: Token if "VARID" == t.tokenType.name => t.text }
   }
 
-  private def peer(n: AstNode): List[Token] = n.tokens.filter { t => !n.immediateChildren.flatMap(_.tokens).contains(t)}
+  private def peer(n: AstNode) = n.tokens.filter { t => !n.immediateChildren.flatMap(_.tokens).contains(t)}
 
-  private def draw(t: Tree[AstNode]): String = {
-    val showRange = (r: Range) => s"${r.offset} ${r.offset + r.length}"
-    implicit val AstNodeShow = new Show[AstNode] {
-      override def shows(n: AstNode) =
-        s"${n.getClass.getSimpleName}: ${nodeToId(n) | "_"} ${n.rangeOpt some showRange none "_"}"
+  object Debug {
+
+    def showAst(src: String): String = draw(treeRec(parse(src).get).head)
+
+    private def treeRec(n: AstNode): List[Tree[AstNode]] = List(n.node(n.immediateChildren ∘ treeRec flatten: _*))
+
+    private def draw(t: Tree[AstNode]) = {
+      implicit val AstNodeShow = new Show[AstNode] {
+        override def shows(n: AstNode) = showAstNode(n)
+      }
+      t.drawTree
     }
-    t.drawTree
+
+    private def showAstNode(n: AstNode) = {
+      val showRange = (r: Range) => s"${r.offset} ${r.offset + r.length}"
+      s"${n.getClass.getSimpleName}: ${nodeToId(n) | "_"} ${n.rangeOpt some showRange none "_"}"
+    }
+
+    private def debugTree(t: Tree[AstNode]) = {
+      println(draw(t)); t
+    }
   }
 }
