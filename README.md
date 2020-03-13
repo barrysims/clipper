@@ -35,13 +35,10 @@ shift ctrl H, or Code->Clip Identifiers
 Build
 -----
 
-A bit of a mish-mash, I'm afraid.  I imagine all of this could be replaced by a simple sbt assembly step, but for now:
-
-1. Do not import sbt project into idea.
-2. Run sbt assembly to package the scala source into lib/clipper-scala.jar
-3. Make sure that intellij is set up to look in action-src for java source files
-4. Run build->Prepare Plugin Module 'clipper' for Deployment
-5. Deploy using settings->plugins->load plugin from disk
+1. Run sbt assembly to package the scala source into lib/clipper-scala.jar
+2. Make sure that intellij is set up to look in action-src for java source files
+3. Run build->Prepare Plugin Module 'clipper' for Deployment
+4. Deploy using settings->plugins->load plugin from disk
 
 TODO
 ----
